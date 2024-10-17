@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "blender-autorender"
+version = "0.1.0"
+description = ""
+authors = ["Manuel Brea <m.brea.carreras@gmail.com>"]
+# readme = "README.md"
+# license = "BSD"
+packages = [{ include = "blender_autorender" }]
+
+[tool.poetry.dependencies]
+python = "~3.11"
+bpy = "^4.2.0"
+pillow = "^11.0.0"
+
+[tool.poetry.scripts]
+blender-autorender = "blender_autorender.__main__:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
