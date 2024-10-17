@@ -1,28 +1,21 @@
 from pathlib import Path
+from typing import Any
 import bpy
 import os
-from dataclasses import dataclass
 from PIL import Image
 
+from blender_autorender.config import CameraConfig, Config, ObjConfig
 
-@dataclass
-class Config:
-    object_name: str
-    action_name: str
-    camera_view: str  # Options: FRONT, SIDE, TOP
-    output_dir: Path
-    sprite_size: int  # Size of each sprite (64x64, 128x128, etc.)
-    sheet_width: int  # Number of sprites per row in the spritesheet
-    frame_step: int
+bpy: Any
 
 
-def set_action_for_object(obj_name, action_name):
+def set_action_for_object(obj_name: str, action_name: str):
     """Set the animation action for the given object."""
-    obj = bpy.data.objects.get(obj_name)
+    obj: Any = bpy.data.objects.get(obj_name)
     if not obj:
         raise ValueError(f"Object {obj_name} not found")
 
-    action = bpy.data.actions.get(action_name)
+    action: Any = bpy.data.actions.get(action_name)
     if not action:
         raise ValueError(f"Action {action_name} not found")
 
@@ -31,29 +24,34 @@ def set_action_for_object(obj_name, action_name):
     obj.animation_data.action = action
 
 
-def set_camera_orthographic_view(view="FRONT"):
+def set_actions_for_objects(objects: list[ObjConfig]):
+    for obj_config in objects:
+        set_action_for_object(obj_config.object_name, obj_config.action_name)
+
+
+def apply_camera_config(cam_config: CameraConfig):
     """Set the camera to orthographic and orient it to the given view."""
-    cam = bpy.data.objects.get("Camera")
+    cam: Any = bpy.data.objects.get("Camera")
     if not cam:
         raise ValueError("No camera object found.")
 
     # Set the camera to orthographic mode
     cam.data.type = "ORTHO"
 
-    cam.data.ortho_scale = 2.0
+    cam.data.ortho_scale = cam_config.ortho_scale
 
     # Position the camera based on the view
-    if view == "FRONT":
+    if cam_config.view == "FRONT":
         cam.location = (0, -10, 0)
         cam.rotation_euler = (0, 0, 0)
-    elif view == "SIDE":
+    elif cam_config.view == "SIDE":
         cam.location = (-10, 0, 0)
         cam.rotation_euler = (0, 1.5708, 0)  # 90 degrees rotation
-    elif view == "TOP":
+    elif cam_config.view == "TOP":
         cam.location = (0, 0, 10)
         cam.rotation_euler = (0, 0, 0)  # 90 degrees rotation in X
     else:
-        raise ValueError(f"Unknown camera view: {view}")
+        raise ValueError(f"Unknown camera view: {cam_config.view}")
 
 
 def configure_transparent_background():
@@ -350,8 +348,8 @@ def setup(config: Config, frame: int):
     configure_transparent_background()
 
     # Set action and camera view
-    set_action_for_object(config.object_name, config.action_name)
-    set_camera_orthographic_view(config.camera_view)
+    set_actions_for_objects(config.object_configs)
+    apply_camera_config(config.camera)
     # Prepare for rendering
     scene = bpy.context.scene
     scene.render.image_settings.file_format = "PNG"
@@ -360,75 +358,78 @@ def setup(config: Config, frame: int):
     bpy.context.scene.frame_set(frame)
 
 
+def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: Config):
+    num_sprites = len(sprite_paths)
+    num_rows = num_sprites // config.sheet_width + (
+        1 if num_sprites % config.sheet_width != 0 else 0
+    )
+    spritesheet_width = config.sheet_width * config.sprite_size
+    spritesheet_height = num_rows * config.sprite_size
+    spritesheet = Image.new("RGBA", (spritesheet_width, spritesheet_height))
+    for index, diffuse_file in enumerate(sprite_paths):
+        diffuse_image = Image.open(diffuse_file)
+        x = (index % config.sheet_width) * config.sprite_size
+        y = (index // config.sheet_width) * config.sprite_size
+        spritesheet.paste(diffuse_image, (x, y))
+
+    spritesheet_output_path = os.path.join(config.output_dir, output_file_name)
+    spritesheet.save(spritesheet_output_path)
+    print(f"Spritesheet saved at {spritesheet_output_path}")
+
+
 def render_spritesheet(config: Config):
     """Render an animation as a spritesheet."""
+
+    bpy.ops.wm.open_mainfile(filepath=str(config.blend_file_path))
 
     # Ensure output directory exists
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
 
-    # Get scene info
-    scene = bpy.context.scene
-    frame_start, frame_end = get_action_frame_range(config.action_name)
-    # frame_start = scene.frame_start
-    # frame_end = scene.frame_end
-    total_frames = frame_end - frame_start + 1
-
-    # Variables for spritesheet dimensions
-    sprites_per_row = config.sheet_width
-    num_rows = (total_frames + sprites_per_row - 1) // sprites_per_row
-    spritesheet_width = sprites_per_row * config.sprite_size
-    spritesheet_height = num_rows * config.sprite_size
-
     # Render each frame as an image for each pass (Diffuse and Normal)
     diffuse_files = []
     normal_files = []
-    for frame in range(frame_start, frame_end + 1, config.frame_step):
+
+    frame = config.start_frame
+
+    condition = (
+        (lambda frame: frame <= config.end_frame)
+        if config.include_last_frame
+        else (lambda frame: frame < config.end_frame)
+    )
+
+    while condition(frame):
         diffuse_path = render_diffuse(config, frame)
         normal_path = render_normal(config, frame)
         diffuse_files.append(diffuse_path)
         normal_files.append(normal_path)
 
+        frame += config.frame_step
 
-    # Diffuse Spritesheet
-    diffuse_spritesheet = Image.new("RGBA", (spritesheet_width, spritesheet_height))
-    for index, diffuse_file in enumerate(diffuse_files):
-        diffuse_image = Image.open(diffuse_file)
-        x = (index % sprites_per_row) * config.sprite_size
-        y = (index // sprites_per_row) * config.sprite_size
-        diffuse_spritesheet.paste(diffuse_image, (x, y))
+    build_spritesheet(diffuse_files, "spritesheet_diffuse.png", config)
+    build_spritesheet(normal_files, "spritesheet_normal.png", config)
 
-    diffuse_spritesheet_output_path = os.path.join(
-        config.output_dir, "spritesheet_diffuse.png"
+
+def validations(config: Config):
+    if (config.end_frame - config.end_frame + 1) % config.frame_step != 0:
+        raise ValueError("Frame step does not divide the total number of frames")
+
+
+def entrypoint(config: Config, config_path: Path):
+    root = config_path.parent
+    blend_file_path = (
+        config.blend_file_path
+        if Path(config.blend_file_path).is_absolute()
+        else root.joinpath(config.blend_file_path)
     )
-    diffuse_spritesheet.save(diffuse_spritesheet_output_path)
-    print(f"Diffuse Spritesheet saved at {diffuse_spritesheet_output_path}")
-
-    # Normal Spritesheet
-    normal_spritesheet = Image.new("RGBA", (spritesheet_width, spritesheet_height))
-    for index, normal_file in enumerate(normal_files):
-        normal_image = Image.open(normal_file)
-        x = (index % sprites_per_row) * config.sprite_size
-        y = (index // sprites_per_row) * config.sprite_size
-        normal_spritesheet.paste(normal_image, (x, y))
-
-    normal_spritesheet_output_path = os.path.join(
-        config.output_dir, "spritesheet_normal.png"
+    output_dir = (
+        config.output_dir
+        if Path(config.output_dir).is_absolute()
+        else root.joinpath(config.output_dir)
     )
-    normal_spritesheet.save(normal_spritesheet_output_path)
-    print(f"Normal Spritesheet saved at {normal_spritesheet_output_path}")
+    config.blend_file_path = blend_file_path
+    config.output_dir = output_dir
 
+    validations(config)
 
-# Example configuration
-config = Config(
-    object_name="metarig",
-    action_name="Walk",
-    camera_view="TOP",  # Options: FRONT, SIDE, TOP
-    output_dir=Path("test_output_spritesheet"),
-    sprite_size=64,  # Size of each sprite (64x64, 128x128, etc.)
-    sheet_width=10,  # Number of sprites per row in the spritesheet
-    frame_step=6,  # Number of sprites per row in the spritesheet
-)
-
-# Call the function to render the spritesheet
-render_spritesheet(config)
+    render_spritesheet(config)

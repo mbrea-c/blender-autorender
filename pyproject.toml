@@ -11,6 +11,7 @@ packages = [{ include = "blender_autorender" }]
 python = "~3.11"
 bpy = "^4.2.0"
 pillow = "^11.0.0"
+dataclasses-json = "^0.6.7"
 
 [tool.poetry.scripts]
 blender-autorender = "blender_autorender.__main__:main"
