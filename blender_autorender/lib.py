@@ -4,7 +4,7 @@ import bpy
 import os
 from PIL import Image
 
-from blender_autorender.config import CameraConfig, Config, ObjConfig
+from blender_autorender.config import CameraConfig, AnimSpriteConfig, ObjConfig
 
 bpy: Any
 
@@ -77,7 +77,7 @@ def cleanup_nodes():
     tree.nodes.clear()
 
 
-def render_diffuse(config: Config, frame: int):
+def render_diffuse(config: AnimSpriteConfig, frame: int):
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
     setup(config, frame)
 
@@ -156,7 +156,7 @@ def render_diffuse(config: Config, frame: int):
     return pathmaker("diffuse")
 
 
-def render_normal(config: Config, frame: int):
+def render_normal(config: AnimSpriteConfig, frame: int):
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
 
     setup(config, frame)
@@ -342,7 +342,7 @@ def get_action_frame_range(action_name):
     return int(min_frame), int(max_frame)
 
 
-def setup(config: Config, frame: int):
+def setup(config: AnimSpriteConfig, frame: int):
     bpy.ops.wm.revert_mainfile()
 
     configure_transparent_background()
@@ -358,7 +358,7 @@ def setup(config: Config, frame: int):
     bpy.context.scene.frame_set(frame)
 
 
-def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: Config):
+def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: AnimSpriteConfig):
     num_sprites = len(sprite_paths)
     num_rows = num_sprites // config.sheet_width + (
         1 if num_sprites % config.sheet_width != 0 else 0
@@ -377,7 +377,7 @@ def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: C
     print(f"Spritesheet saved at {spritesheet_output_path}")
 
 
-def render_spritesheet(config: Config):
+def render_spritesheet(config: AnimSpriteConfig):
     """Render an animation as a spritesheet."""
 
     bpy.ops.wm.open_mainfile(filepath=str(config.blend_file_path))
@@ -410,12 +410,12 @@ def render_spritesheet(config: Config):
     build_spritesheet(normal_files, "spritesheet_normal.png", config)
 
 
-def validations(config: Config):
+def validations(config: AnimSpriteConfig):
     if (config.end_frame - config.end_frame + 1) % config.frame_step != 0:
         raise ValueError("Frame step does not divide the total number of frames")
 
 
-def entrypoint(config: Config, config_path: Path):
+def entrypoint(config: AnimSpriteConfig, config_path: Path):
     root = config_path.parent
     blend_file_path = (
         config.blend_file_path

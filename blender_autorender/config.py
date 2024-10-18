@@ -20,7 +20,7 @@ class CameraConfig:
 
 @dataclass_json
 @dataclass
-class Config:
+class AnimSpriteConfig:
     # Path to the .blend file to load. If relative, is relative to config file
     blend_file_path: Path
     # Path to the output directory. If relative, is relative to config file
@@ -34,3 +34,13 @@ class Config:
     include_last_frame: bool = False
     camera: CameraConfig = field(default_factory=CameraConfig)
     object_configs: list[ObjConfig] = field(default_factory=list)
+
+@dataclass_json
+@dataclass
+class MaterialConfig:
+    # Path to the .blend file to load. If relative, is relative to config file
+    blend_file_path: Path
+    material_name: str
+    # Path to the output directory. If relative, is relative to config file
+    output_dir: Path
+    sprite_size: int  # Size of each sprite (64x64, 128x128, etc.)
