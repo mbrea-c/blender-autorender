@@ -42,6 +42,7 @@ class AnimSceneProcessor:
 
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
+        bpy.context.active_action = action
 
         bpy.ops.nla.bake(
             frame_start=int(action.frame_range[0]),
