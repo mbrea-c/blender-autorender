@@ -1,6 +1,6 @@
 {
   "blend_file_path": "cobblestone.blend",
-  "output_dir": "cobblestone_outputs",
+  "output_dir": "outputs/cobblestone",
   "material_configs": [
     {
       "id": "cobblestone_floor",

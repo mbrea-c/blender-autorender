@@ -11,6 +11,12 @@
           "bake_config": {
             "step": 1
           }
+        },
+        {
+          "action_name": "run",
+          "bake_config": {
+            "step": 1
+          }
         }
       ]
     }

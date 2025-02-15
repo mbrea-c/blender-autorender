@@ -1,4 +1,4 @@
 __pycache__
-test_files/*_outputs
+/test_files/outputs
 /.direnv
 /.png

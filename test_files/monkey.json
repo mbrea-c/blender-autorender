@@ -1,6 +1,6 @@
 {
   "blend_file_path": "monkey.blend",
-  "output_dir": "monkey_outputs",
+  "output_dir": "outputs/monkey",
   "anim_sprite_configs": [
     {
       "id": "monkey_orbit",

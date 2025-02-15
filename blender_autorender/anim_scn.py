@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
+from typing import Any
 from blender_autorender.config import ActionConfig, AnimSceneConfig
-from bpy import bpy
+import bpy
 
+bpy: Any
 
 class AnimSceneProcessor:
     def __init__(
@@ -42,8 +44,8 @@ class AnimSceneProcessor:
         bpy.context.view_layer.objects.active = obj
 
         bpy.ops.nla.bake(
-            frame_start=action.frame_range[0],
-            frame_end=action.frame_range[1],
+            frame_start=int(action.frame_range[0]),
+            frame_end=int(action.frame_range[1]),
             step=config.bake_config.step,
             only_selected=False,
             visual_keying=True,
@@ -57,7 +59,7 @@ class AnimSceneProcessor:
         action = bpy.data.actions[config.action_name]
         track = obj.animation_data.nla_tracks.new()
         track.name = config.action_name
-        strip = track.strips.new(config.action_name, action.frame_range[0], action)
+        strip = track.strips.new(config.action_name, int(action.frame_range[0]), action)
         strip.action = action
 
     def _export_gltf(self):
@@ -65,6 +67,6 @@ class AnimSceneProcessor:
             filepath=str(self.output_dir.joinpath("model.glb")),
             export_format="GLB",
             export_animations=True,
-            export_animations_mode="ACTIONS",
+            export_animation_mode="ACTIONS",
             export_force_sampling=False,
         )
