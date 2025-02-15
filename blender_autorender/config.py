@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import List, Optional
 from dataclasses_json import dataclass_json
 from pathlib import Path
 
@@ -21,10 +22,9 @@ class CameraConfig:
 @dataclass_json
 @dataclass
 class AnimSpriteConfig:
-    # Path to the .blend file to load. If relative, is relative to config file
-    blend_file_path: Path
-    # Path to the output directory. If relative, is relative to config file
-    output_dir: Path
+    # Used to create a named directory for the outputs
+    id: str
+
     sprite_size: int  # Size of each sprite (64x64, 128x128, etc.)
     sheet_width: int  # Number of sprites per row in the spritesheet
 
@@ -35,12 +35,26 @@ class AnimSpriteConfig:
     camera: CameraConfig = field(default_factory=CameraConfig)
     object_configs: list[ObjConfig] = field(default_factory=list)
 
+
 @dataclass_json
 @dataclass
 class MaterialConfig:
+    # Used to create a named directory for the outputs
+    id: str
+    # Name of material in blend file
+    material_name: str
+    # Size of each sprite (64x64, 128x128, etc.)
+    sprite_size: int
+
+
+@dataclass_json
+@dataclass
+class TopLevelConfig:
     # Path to the .blend file to load. If relative, is relative to config file
     blend_file_path: Path
-    material_name: str
     # Path to the output directory. If relative, is relative to config file
     output_dir: Path
-    sprite_size: int  # Size of each sprite (64x64, 128x128, etc.)
+    # If present, a material will be processed from the given blend file
+    material_configs: List[MaterialConfig] = field(default_factory=list)
+    # If present, an animated sprite will be processed from the given blend file
+    anim_sprite_configs: List[AnimSpriteConfig] = field(default_factory=list)

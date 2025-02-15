@@ -77,7 +77,7 @@ def cleanup_nodes():
     tree.nodes.clear()
 
 
-def render_diffuse(config: AnimSpriteConfig, frame: int):
+def render_diffuse(config: AnimSpriteConfig, frame: int, output_dir: Path):
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
     setup(config, frame)
 
@@ -116,7 +116,7 @@ def render_diffuse(config: AnimSpriteConfig, frame: int):
     # Create a node for outputting the rendered image
     image_output_node = tree.nodes.new(type="CompositorNodeOutputFile")
     image_output_node.label = "Image_Output"
-    image_output_node.base_path = os.path.join(config.output_dir, "diffuse")
+    image_output_node.base_path = str(output_dir.joinpath("diffuse"))
     image_output_node.file_slots[0].path = f"diffuse_####"
     image_output_node.location = 400, 0
 
@@ -151,17 +151,17 @@ def render_diffuse(config: AnimSpriteConfig, frame: int):
     scene.frame_set(frame)
     bpy.ops.render.render(write_still=True)
 
-    pathmaker = lambda t: os.path.join(config.output_dir, f"{t}/{t}_{frame:04d}.png")
+    pathmaker = lambda t: output_dir.joinpath(f"{t}/{t}_{frame:04d}.png")
 
     return pathmaker("diffuse")
 
 
-def render_normal(config: AnimSpriteConfig, frame: int):
+def render_normal(config: AnimSpriteConfig, frame: int, output_dir: Path):
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
 
     setup(config, frame)
 
-    output_path = os.path.join(config.output_dir, f"normal/normal_{frame:04d}.png")
+    output_path = output_dir.joinpath(f"normal/normal_{frame:04d}.png")
 
     # Clear existing materials
     for mat in bpy.data.materials:
@@ -174,7 +174,7 @@ def render_normal(config: AnimSpriteConfig, frame: int):
 
     scene.render.image_settings.file_format = "PNG"
     scene.render.engine = "BLENDER_WORKBENCH"
-    scene.render.filepath = output_path
+    scene.render.filepath = str(output_path)
 
     scene.render.film_transparent = True
     scene.view_settings.view_transform = "Standard"
@@ -358,7 +358,12 @@ def setup(config: AnimSpriteConfig, frame: int):
     bpy.context.scene.frame_set(frame)
 
 
-def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: AnimSpriteConfig):
+def build_spritesheet(
+    sprite_paths: list[Path],
+    output_file_name: str,
+    config: AnimSpriteConfig,
+    output_dir: Path,
+):
     num_sprites = len(sprite_paths)
     num_rows = num_sprites // config.sheet_width + (
         1 if num_sprites % config.sheet_width != 0 else 0
@@ -372,19 +377,21 @@ def build_spritesheet(sprite_paths: list[Path], output_file_name: str, config: A
         y = (index // config.sheet_width) * config.sprite_size
         spritesheet.paste(diffuse_image, (x, y))
 
-    spritesheet_output_path = os.path.join(config.output_dir, output_file_name)
+    spritesheet_output_path = output_dir.joinpath(output_file_name)
     spritesheet.save(spritesheet_output_path)
     print(f"Spritesheet saved at {spritesheet_output_path}")
 
 
-def render_spritesheet(config: AnimSpriteConfig):
+def render_spritesheet(
+    config: AnimSpriteConfig, blend_file_path: Path, output_dir: Path
+):
     """Render an animation as a spritesheet."""
 
-    bpy.ops.wm.open_mainfile(filepath=str(config.blend_file_path))
+    bpy.ops.wm.open_mainfile(filepath=str(blend_file_path))
 
     # Ensure output directory exists
-    if not os.path.exists(config.output_dir):
-        os.makedirs(config.output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # Render each frame as an image for each pass (Diffuse and Normal)
     diffuse_files = []
@@ -399,15 +406,19 @@ def render_spritesheet(config: AnimSpriteConfig):
     )
 
     while condition(frame):
-        diffuse_path = render_diffuse(config, frame)
-        normal_path = render_normal(config, frame)
+        diffuse_path = render_diffuse(config, frame, output_dir=output_dir)
+        normal_path = render_normal(config, frame, output_dir=output_dir)
         diffuse_files.append(diffuse_path)
         normal_files.append(normal_path)
 
         frame += config.frame_step
 
-    build_spritesheet(diffuse_files, "spritesheet_diffuse.png", config)
-    build_spritesheet(normal_files, "spritesheet_normal.png", config)
+    build_spritesheet(
+        diffuse_files, "spritesheet_diffuse.png", config, output_dir=output_dir
+    )
+    build_spritesheet(
+        normal_files, "spritesheet_normal.png", config, output_dir=output_dir
+    )
 
 
 def validations(config: AnimSpriteConfig):
@@ -415,21 +426,11 @@ def validations(config: AnimSpriteConfig):
         raise ValueError("Frame step does not divide the total number of frames")
 
 
-def entrypoint(config: AnimSpriteConfig, config_path: Path):
-    root = config_path.parent
-    blend_file_path = (
-        config.blend_file_path
-        if Path(config.blend_file_path).is_absolute()
-        else root.joinpath(config.blend_file_path)
-    )
-    output_dir = (
-        config.output_dir
-        if Path(config.output_dir).is_absolute()
-        else root.joinpath(config.output_dir)
-    )
-    config.blend_file_path = blend_file_path
-    config.output_dir = output_dir
+def entrypoint(
+    config: AnimSpriteConfig, blend_file_path: Path, toplevel_output_dir: Path
+):
+    output_dir = toplevel_output_dir.joinpath("spritesheets").joinpath(config.id)
 
     validations(config)
 
-    render_spritesheet(config)
+    render_spritesheet(config, blend_file_path=blend_file_path, output_dir=output_dir)

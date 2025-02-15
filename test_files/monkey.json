@@ -1,24 +1,29 @@
 {
-  "object_configs": [
-    {
-      "object_name": "monkey",
-      "action_name": "monkey_dance"
-    },
-    {
-      "object_name": "sphere",
-      "action_name": "sphere_dance"
-    }
-  ],
-  "camera": {
-    "view": "TOP",
-    "ortho_scale": 6.0
-  },
   "blend_file_path": "monkey.blend",
   "output_dir": "monkey_outputs",
-  "sprite_size": 64,
-  "sheet_width": 10,
-  "start_frame": 1,
-  "end_frame": 24,
-  "frame_step": 1,
-  "include_last_frame": false
+  "anim_sprite_configs": [
+    {
+      "id": "monkey_orbit",
+      "object_configs": [
+        {
+          "object_name": "monkey",
+          "action_name": "monkey_dance"
+        },
+        {
+          "object_name": "sphere",
+          "action_name": "sphere_dance"
+        }
+      ],
+      "camera": {
+        "view": "TOP",
+        "ortho_scale": 6.0
+      },
+      "sprite_size": 64,
+      "sheet_width": 10,
+      "start_frame": 1,
+      "end_frame": 24,
+      "frame_step": 1,
+      "include_last_frame": false
+    }
+  ]
 }
