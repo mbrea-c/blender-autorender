@@ -1,0 +1,18 @@
+{
+  "blend_file_path": "animated_human.blend",
+  "output_dir": "outputs/animated_human",
+  "anim_scene_configs": [
+    {
+      "id": "animated_human",
+      "object_name": "Main Controller",
+      "action_configs": [
+        {
+          "action_name": "walk",
+          "bake_config": {
+            "step": 1
+          }
+        }
+      ]
+    }
+  ]
+}

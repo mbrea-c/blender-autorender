@@ -1,7 +1,11 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 from dataclasses_json import dataclass_json
+import dataclasses_json.cfg
 from pathlib import Path
+
+dataclasses_json.cfg.global_config.encoders[Path] = str
+dataclasses_json.cfg.global_config.decoders[Path] = Path
 
 
 @dataclass_json
@@ -49,6 +53,28 @@ class MaterialConfig:
 
 @dataclass_json
 @dataclass
+class BakeConfig:
+    step: int = 1
+
+
+@dataclass_json
+@dataclass
+class ActionConfig:
+    action_name: str
+    bake_config: BakeConfig
+
+
+@dataclass_json
+@dataclass
+class AnimSceneConfig:
+    # Used to create a named directory for the outputs
+    id: str
+    object_name: str
+    action_configs: list[ActionConfig] = field(default_factory=list)
+
+
+@dataclass_json
+@dataclass
 class TopLevelConfig:
     # Path to the .blend file to load. If relative, is relative to config file
     blend_file_path: Path
@@ -58,3 +84,5 @@ class TopLevelConfig:
     material_configs: List[MaterialConfig] = field(default_factory=list)
     # If present, an animated sprite will be processed from the given blend file
     anim_sprite_configs: List[AnimSpriteConfig] = field(default_factory=list)
+    # If present, a gltf animated scene will be processed from the given blend file
+    anim_scene_configs: List[AnimSceneConfig] = field(default_factory=list)

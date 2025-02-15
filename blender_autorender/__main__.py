@@ -2,6 +2,7 @@ import os
 import argparse
 from pathlib import Path
 
+from blender_autorender.anim_scn import AnimSceneProcessor
 from blender_autorender.config import TopLevelConfig
 from blender_autorender.anim_sprite import entrypoint
 from blender_autorender.material import entrypoint_material
@@ -48,6 +49,13 @@ def main():
             blend_file_path=blend_file_path,
             toplevel_output_dir=output_dir,
         )
+    for anim_scene_config in config.anim_scene_configs:
+        processor = AnimSceneProcessor(
+            config=anim_scene_config,
+            blend_file_path=blend_file_path,
+            toplevel_output_dir=output_dir,
+        )
+        processor.process()
 
 
 def resolve_path(config_path: Path, potentially_relative_path: Path) -> Path:

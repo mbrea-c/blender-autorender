@@ -77,7 +77,7 @@ def cleanup_nodes():
     tree.nodes.clear()
 
 
-def render_diffuse(config: AnimSpriteConfig, frame: int, output_dir: Path):
+def render_diffuse(config: AnimSpriteConfig, frame: int, output_dir: Path) -> Path:
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
     setup(config, frame)
 
@@ -156,7 +156,7 @@ def render_diffuse(config: AnimSpriteConfig, frame: int, output_dir: Path):
     return pathmaker("diffuse")
 
 
-def render_normal(config: AnimSpriteConfig, frame: int, output_dir: Path):
+def render_normal(config: AnimSpriteConfig, frame: int, output_dir: Path) -> Path:
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
 
     setup(config, frame)

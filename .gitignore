@@ -1,3 +1,4 @@
 __pycache__
 test_files/*_outputs
 /.direnv
+/.png

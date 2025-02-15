@@ -33,7 +33,6 @@ def create_plane_with_material(material_name):
 
 # Function to bake a given type of texture (e.g., Diffuse, Normal, Roughness)
 def bake_texture(material_name: str, texture_type: str, file_output: Path):
-    scene = bpy.context.scene
     obj = bpy.context.view_layer.objects.active
 
     # Set the object to active and ensure it's in Object mode
