@@ -20,3 +20,9 @@ Once you have that, you can:
   ```bash
   nix develop
   ```
+
+  Direnv will do this automatically for you if you have it configured to do so.
+
+Alternatively, the boring way is to just look at the `flake.nix` file, install
+the system dependencies manually (e.g. `apt install <stuff>` if you're on
+Ubuntu) and run the program with Poetry.
