@@ -19,7 +19,7 @@ class AnimSceneProcessor:
     ):
         self.config = config
         self.blend_file_path = blend_file_path
-        self.output_dir = toplevel_output_dir.joinpath("spritesheets").joinpath(
+        self.output_dir = toplevel_output_dir.joinpath("anim_scenes").joinpath(
             config.id
         )
 
