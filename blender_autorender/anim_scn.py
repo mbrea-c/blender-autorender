@@ -110,6 +110,7 @@ class AnimSceneProcessor:
             export_animations=True,
             export_animation_mode="ACTIONS",
             export_force_sampling=False,
+            export_apply=True,
         )
 
     def _save_temp_for_debug(self, name: str = "debug_scene"):
