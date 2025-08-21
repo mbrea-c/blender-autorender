@@ -26,7 +26,8 @@ def set_action_for_object(obj_name: str, action_name: str):
 
 def set_actions_for_objects(objects: list[ObjConfig]):
     for obj_config in objects:
-        set_action_for_object(obj_config.object_name, obj_config.action_name)
+        if obj_config.action_name is not None:
+            set_action_for_object(obj_config.object_name, obj_config.action_name)
 
 
 def apply_camera_config(cam_config: CameraConfig):

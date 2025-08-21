@@ -12,7 +12,7 @@ dataclasses_json.cfg.global_config.decoders[Path] = Path
 @dataclass
 class ObjConfig:
     object_name: str
-    action_name: str
+    action_name: str | None
 
 
 @dataclass_json
