@@ -78,7 +78,129 @@ def cleanup_nodes():
     tree.nodes.clear()
 
 
-def render_diffuse(config: AnimSpriteConfig, frame: int, output_dir: Path) -> Path:
+def render_diffuse_extract(
+    config: AnimSpriteConfig, frame: int, output_dir: Path
+) -> Path:
+    """Render out the raw albedo by directing the material base color to an emissive material node, and using that as the output.
+
+    Only works if the final output of each material used is a BSDF node.
+    """
+    setup(config, frame)
+
+    original_materials = dict()
+
+    for i, obj_config in enumerate(config.object_configs):
+        obj = bpy.data.objects.get(obj_config.object_name)
+        if not obj.material_slots:
+            mat = bpy.data.materials.new(name=f"{obj.name}_Material")
+            mat.use_nodes = True
+            obj.data.materials.append(mat)
+        for j, slot in enumerate(obj.material_slots):
+            if not slot.material:
+                mat = bpy.data.materials.new(name=f"{obj.name}_{j}_Material")
+                mat.use_nodes = True
+                slot.material = mat
+
+            print(f"Obj {obj_config.object_name} slot {j}: Replacing material")
+            original_materials[(i, j)] = slot.material
+
+            new_mat = slot.material.copy()
+            new_mat.rename(f"___BaseColorExport_{i}_{j}")
+            new_mat.use_nodes = True
+            nt = new_mat.node_tree
+
+            # Find Material Output
+            for node in nt.nodes:
+                if node.type == "OUTPUT_MATERIAL":
+                    out_node = node
+                    break
+            else:
+                print(
+                    f"Obj {obj_config.object_name} slot {j}: Could not find material output"
+                )
+                continue
+
+            surface_input = out_node.inputs.get("Surface")
+            if not surface_input or not surface_input.is_linked:
+                print(
+                    f"Obj {obj_config.object_name} slot {j}: Material output surface not linked"
+                )
+                continue
+            surface_input_link = surface_input.links[0]
+            surface_source_node = surface_input_link.from_node
+
+            if surface_source_node.type == "BSDF_PRINCIPLED":
+                # Make an Emission node
+                emission = nt.nodes.new("ShaderNodeEmission")
+                emission.location = surface_source_node.location
+
+                # Use the BSDF base color as emission input
+                base_input = surface_source_node.inputs["Base Color"]
+                if base_input.is_linked:
+                    nt.links.new(
+                        base_input.links[0].from_socket, emission.inputs["Color"]
+                    )
+                else:
+                    emission.inputs["Color"].default_value = base_input.default_value
+
+                # Reconnect emission -> output
+                nt.links.new(emission.outputs["Emission"], surface_input_link.to_socket)
+
+                # Optionally: mute the original BSDF
+                surface_source_node.mute = True
+            slot.material = new_mat
+
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.render.film_transparent = True
+    scene.render.filepath = ""
+    # Set "view transform" to "Raw"
+    scene.view_settings.view_transform = "Raw"
+
+    # Set image output settings
+    scene.render.image_settings.file_format = (
+        "PNG"  # Ensure output as PNG (supports alpha for diffuse)
+    )
+    scene.render.image_settings.color_mode = (
+        "RGBA"  # Enable transparency (for diffuse if needed)
+    )
+    scene.render.filter_size = 0.01
+
+    # Switch on nodes and get reference
+    scene.use_nodes = True
+    cleanup_nodes()
+    tree = scene.node_tree
+    world_tree = scene.world.node_tree
+    links = tree.links
+
+    bg_node = world_tree.nodes["Background"]
+    bg_node.inputs["Strength"].default_value = 0.0
+
+    # Create a node for outputting the rendered image
+    image_output_node = tree.nodes.new(type="CompositorNodeOutputFile")
+    image_output_node.label = "Image_Output"
+    image_output_node.base_path = str(output_dir.joinpath("diffuse"))
+    image_output_node.file_slots[0].path = f"diffuse_####"
+    image_output_node.location = 400, 0
+
+    # Create a node for the output from the renderer
+    render_layers_node = tree.nodes.new(type="CompositorNodeRLayers")
+    render_layers_node.location = 0, 0
+
+    # Link to compositor output
+    links.new(render_layers_node.outputs["Image"], image_output_node.inputs["Image"])
+
+    scene.frame_set(frame)
+    bpy.ops.render.render(write_still=True)
+
+    pathmaker = lambda t: output_dir.joinpath(f"{t}/{t}_{frame:04d}.png")
+
+    return pathmaker("diffuse")
+
+
+def render_diffuse_legacy(
+    config: AnimSpriteConfig, frame: int, output_dir: Path
+) -> Path:
     """Configure Blender to output specific render passes (Diffuse and Normal)."""
     setup(config, frame)
 
@@ -407,7 +529,7 @@ def render_spritesheet(
     )
 
     while condition(frame):
-        diffuse_path = render_diffuse(config, frame, output_dir=output_dir)
+        diffuse_path = render_diffuse_extract(config, frame, output_dir=output_dir)
         normal_path = render_normal(config, frame, output_dir=output_dir)
         diffuse_files.append(diffuse_path)
         normal_files.append(normal_path)
