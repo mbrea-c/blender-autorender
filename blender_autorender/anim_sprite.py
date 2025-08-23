@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 import bpy
 import os
+import numpy as np
 from PIL import Image
 
 from blender_autorender.config import CameraConfig, AnimSpriteConfig, ObjConfig
@@ -78,10 +79,14 @@ def cleanup_nodes():
     tree.nodes.clear()
 
 
-def render_diffuse_extract(
-    config: AnimSpriteConfig, frame: int, output_dir: Path
+def render_bsdf_input(
+    config: AnimSpriteConfig,
+    frame: int,
+    output_dir: Path,
+    bsdf_input_name: str,
+    saved_prefix: str,
 ) -> Path:
-    """Render out the raw albedo by directing the material base color to an emissive material node, and using that as the output.
+    """Render out the a particular BSDF input from a scene as emissive color layer.
 
     Only works if the final output of each material used is a BSDF node.
     """
@@ -105,7 +110,7 @@ def render_diffuse_extract(
             original_materials[(i, j)] = slot.material
 
             new_mat = slot.material.copy()
-            new_mat.rename(f"___BaseColorExport_{i}_{j}")
+            new_mat.rename(f"___{bsdf_input_name.replace(' ', '')}Export_{i}_{j}")
             new_mat.use_nodes = True
             nt = new_mat.node_tree
 
@@ -135,13 +140,19 @@ def render_diffuse_extract(
                 emission.location = surface_source_node.location
 
                 # Use the BSDF base color as emission input
-                base_input = surface_source_node.inputs["Base Color"]
+                base_input = surface_source_node.inputs[bsdf_input_name]
                 if base_input.is_linked:
                     nt.links.new(
                         base_input.links[0].from_socket, emission.inputs["Color"]
                     )
                 else:
-                    emission.inputs["Color"].default_value = base_input.default_value
+                    if isinstance(base_input.default_value, float):
+                        val = base_input.default_value
+                        emission.inputs["Color"].default_value = (val, val, val, 1.0)
+                    else:
+                        emission.inputs["Color"].default_value = (
+                            base_input.default_value
+                        )
 
                 # Reconnect emission -> output
                 nt.links.new(emission.outputs["Emission"], surface_input_link.to_socket)
@@ -179,8 +190,8 @@ def render_diffuse_extract(
     # Create a node for outputting the rendered image
     image_output_node = tree.nodes.new(type="CompositorNodeOutputFile")
     image_output_node.label = "Image_Output"
-    image_output_node.base_path = str(output_dir.joinpath("diffuse"))
-    image_output_node.file_slots[0].path = f"diffuse_####"
+    image_output_node.base_path = str(output_dir.joinpath(saved_prefix))
+    image_output_node.file_slots[0].path = f"{saved_prefix}_####"
     image_output_node.location = 400, 0
 
     # Create a node for the output from the renderer
@@ -195,7 +206,30 @@ def render_diffuse_extract(
 
     pathmaker = lambda t: output_dir.joinpath(f"{t}/{t}_{frame:04d}.png")
 
-    return pathmaker("diffuse")
+    return pathmaker(saved_prefix)
+
+
+def render_diffuse_extract(
+    config: AnimSpriteConfig, frame: int, output_dir: Path
+) -> Path:
+    """Render out the raw albedo by directing the material base color to an emissive material node, and using that as the output.
+
+    Only works if the final output of each material used is a BSDF node.
+    """
+
+    return render_bsdf_input(config, frame, output_dir, "Base Color", "diffuse")
+
+
+def render_metallic_extract(
+    config: AnimSpriteConfig, frame: int, output_dir: Path
+) -> Path:
+    return render_bsdf_input(config, frame, output_dir, "Metallic", "metallic")
+
+
+def render_roughness_extract(
+    config: AnimSpriteConfig, frame: int, output_dir: Path
+) -> Path:
+    return render_bsdf_input(config, frame, output_dir, "Roughness", "roughness")
 
 
 def render_diffuse_legacy(
@@ -505,6 +539,73 @@ def build_spritesheet(
     print(f"Spritesheet saved at {spritesheet_output_path}")
 
 
+def pack_channels(
+    red: Path | None,
+    green: Path | None,
+    blue: Path | None,
+    output_file_name: str,
+    config: AnimSpriteConfig,
+    output_dir: Path,
+)-> Path:
+    def load_or_default(
+        img_path: Path | None,
+        default_value: int = 0,
+        default_alpha: int = 0,
+        size: tuple[int, int] | None = None,
+    ) -> Image.Image:
+        if img_path:
+            img = Image.open(img_path).convert("LA")
+            if size:
+                img = img.resize(size)
+        else:
+            assert size is not None
+            l = Image.new("L", size, color=default_value)
+            a = Image.new("L", size, color=default_alpha)
+            img = Image.merge("LA", (l, a))
+        return img
+
+    red_img = load_or_default(
+        red,
+        default_value=0,
+        default_alpha=0,
+        size=(config.sprite_size, config.sprite_size),
+    )
+    green_img = load_or_default(
+        green,
+        default_value=0,
+        default_alpha=0,
+        size=(config.sprite_size, config.sprite_size),
+    )
+    blue_img = load_or_default(
+        blue,
+        default_value=0,
+        default_alpha=0,
+        size=(config.sprite_size, config.sprite_size),
+    )
+    alphas = []
+    for img in (red_img, green_img, blue_img):
+        assert img.mode == "LA"
+        alphas.append(np.array(img.getchannel("A"), dtype=np.uint8))
+
+    alpha_max = np.maximum.reduce(alphas)
+    alpha_img = Image.fromarray(alpha_max, mode="L")
+
+    merged = Image.merge(
+        "RGBA",
+        (
+            red_img.getchannel("L"),
+            green_img.getchannel("L"),
+            blue_img.getchannel("L"),
+            alpha_img,
+        ),
+    )
+    if not output_dir.exists():
+        output_dir.mkdir()
+    path = output_dir.joinpath(output_file_name)
+    merged.save(path)
+    return path
+
+
 def render_spritesheet(
     config: AnimSpriteConfig, blend_file_path: Path, output_dir: Path
 ):
@@ -519,6 +620,9 @@ def render_spritesheet(
     # Render each frame as an image for each pass (Diffuse and Normal)
     diffuse_files = []
     normal_files = []
+    metallic_files = []
+    roughness_files = []
+    orm_files = []
 
     frame = config.start_frame
 
@@ -530,18 +634,30 @@ def render_spritesheet(
 
     while condition(frame):
         diffuse_path = render_diffuse_extract(config, frame, output_dir=output_dir)
+        metallic_path = render_metallic_extract(config, frame, output_dir=output_dir)
+        roughness_path = render_roughness_extract(config, frame, output_dir=output_dir)
         normal_path = render_normal(config, frame, output_dir=output_dir)
+        orm_path = pack_channels(
+            None,
+            roughness_path,
+            metallic_path,
+            output_file_name=diffuse_path.name.replace("diffuse", "orm"),
+            config=config,
+            output_dir=output_dir.joinpath("orm"),
+        )
         diffuse_files.append(diffuse_path)
         normal_files.append(normal_path)
+        metallic_files.append(metallic_path)
+        roughness_files.append(roughness_path)
+        orm_files.append(orm_path)
 
         frame += config.frame_step
 
-    build_spritesheet(
-        diffuse_files, "spritesheet_diffuse.png", config, output_dir=output_dir
-    )
-    build_spritesheet(
-        normal_files, "spritesheet_normal.png", config, output_dir=output_dir
-    )
+    build_spritesheet(diffuse_files, "diffuse.png", config, output_dir=output_dir)
+    build_spritesheet(normal_files, "normal.png", config, output_dir=output_dir)
+    build_spritesheet(roughness_files, "roughness.png", config, output_dir=output_dir)
+    build_spritesheet(metallic_files, "metallic.png", config, output_dir=output_dir)
+    build_spritesheet(orm_files, "orm.png", config, output_dir=output_dir)
 
 
 def validations(config: AnimSpriteConfig):
