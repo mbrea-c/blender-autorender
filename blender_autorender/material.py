@@ -33,7 +33,7 @@ def create_plane_with_material(material_name):
 
 
 # Function to bake a given type of texture (e.g., Diffuse, Normal, Roughness)
-def bake_texture(material_name: str, texture_type: str, file_output: Path):
+def bake_texture(config: MaterialConfig, texture_type: str, file_output: Path):
     obj = bpy.context.view_layer.objects.active
 
     # Set the object to active and ensure it's in Object mode
@@ -42,10 +42,12 @@ def bake_texture(material_name: str, texture_type: str, file_output: Path):
     bpy.context.view_layer.objects.active = obj
 
     # Create a new image for baking
-    image = bpy.data.images.new(f"{texture_type}.png", width=64, height=64)
+    image = bpy.data.images.new(
+        f"{texture_type}.png", width=config.sprite_size, height=config.sprite_size
+    )
 
     # Create a new image texture node in the material
-    material = bpy.data.materials[material_name]
+    material = bpy.data.materials[config.material_name]
     node_tree = material.node_tree
     nodes = node_tree.nodes
     image_node = nodes.new(type="ShaderNodeTexImage")
@@ -94,21 +96,21 @@ def bake_material_maps(config: MaterialConfig, blend_file_path: Path, output_dir
 
     # Bake Diffuse map
     bake_texture(
-        material_name=config.material_name,
+        config=config,
         texture_type="diffuse",
         file_output=output_dir.joinpath("diffuse.png"),
     )
 
     # Bake Normal map
     bake_texture(
-        material_name=config.material_name,
+        config=config,
         texture_type="normal",
         file_output=output_dir.joinpath("normal.png"),
     )
 
     # Bake Roughness map
     bake_texture(
-        material_name=config.material_name,
+        config=config,
         texture_type="roughness",
         file_output=roughness_path,
     )
