@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 from blender_autorender.config import MaterialConfig
+from blender_autorender.utils import pack_channels
 import bpy
 import os
 
@@ -88,6 +89,9 @@ def bake_material_maps(config: MaterialConfig, blend_file_path: Path, output_dir
     # Create a plane and apply the material
     create_plane_with_material(config.material_name)
 
+    roughness_path = output_dir.joinpath("roughness.png")
+    metallic_path = output_dir.joinpath("metallic.png")
+
     # Bake Diffuse map
     bake_texture(
         material_name=config.material_name,
@@ -106,7 +110,23 @@ def bake_material_maps(config: MaterialConfig, blend_file_path: Path, output_dir
     bake_texture(
         material_name=config.material_name,
         texture_type="roughness",
-        file_output=output_dir.joinpath("roughness.png"),
+        file_output=roughness_path,
+    )
+
+    # Bake metallic map
+    # bake_texture(
+    #     material_name=config.material_name,
+    #     texture_type="metallic",
+    #     file_output=metallic_path,
+    # )
+
+    pack_channels(
+        None,
+        roughness_path,
+        None,
+        output_file_name="orm.png",
+        img_size=config.sprite_size,
+        output_dir=output_dir,
     )
 
     print("Baking completed!")
