@@ -1,7 +1,10 @@
+# pyright: basic
+
 from pathlib import Path
+from typing import Any
+from uuid import uuid4
 from PIL import Image
 import numpy as np
-
 
 def pack_channels(
     red: Path | None,
@@ -68,3 +71,60 @@ def pack_channels(
     path = output_dir.joinpath(output_file_name)
     merged.save(path)
     return path
+
+
+Material = Any
+
+
+def reconnect_bsdf_input(
+    material: Material,
+    bsdf_input_name: str,
+) -> Material | None:
+    """
+    This function creates a BSDF material where the provided input name is reconnected as an emission output.
+    Assumes the provided material has a BSDF_PRINCIPLED directly connected to the surface input of the material output.
+    """
+    new_mat = material.copy()
+    new_mat.rename(f"___{bsdf_input_name.replace(' ', '')}Export_{uuid4()}")
+    new_mat.use_nodes = True
+    nt = new_mat.node_tree
+
+    # Find Material Output
+    for node in nt.nodes:
+        if node.type == "OUTPUT_MATERIAL":
+            out_node = node
+            break
+    else:
+        print(f"Material {material.name}: Could not find material output")
+        return None
+
+    surface_input = out_node.inputs.get("Surface")
+    if not surface_input or not surface_input.is_linked:
+        print(f"Material {material.name}: Material output surface not linked")
+        return None
+
+    surface_input_link = surface_input.links[0]
+    surface_source_node = surface_input_link.from_node
+
+    if surface_source_node.type == "BSDF_PRINCIPLED":
+        # Make an Emission node
+        emission = nt.nodes.new("ShaderNodeEmission")
+        emission.location = surface_source_node.location
+
+        # Use the BSDF base color as emission input
+        base_input = surface_source_node.inputs[bsdf_input_name]
+        if base_input.is_linked:
+            nt.links.new(base_input.links[0].from_socket, emission.inputs["Color"])
+        else:
+            if isinstance(base_input.default_value, float):
+                val = base_input.default_value
+                emission.inputs["Color"].default_value = (val, val, val, 1.0)
+            else:
+                emission.inputs["Color"].default_value = base_input.default_value
+
+        # Reconnect emission -> output
+        nt.links.new(emission.outputs["Emission"], surface_input_link.to_socket)
+
+        # Optionally: mute the original BSDF
+        surface_source_node.mute = True
+    return new_mat

@@ -1,9 +1,8 @@
 from pathlib import Path
 from typing import Any
-from blender_autorender.utils import pack_channels
+from blender_autorender.utils import pack_channels, reconnect_bsdf_input
 import bpy
 import os
-import numpy as np
 from PIL import Image
 
 from blender_autorender.config import CameraConfig, AnimSpriteConfig, ObjConfig
@@ -110,56 +109,9 @@ def render_bsdf_input(
             print(f"Obj {obj_config.object_name} slot {j}: Replacing material")
             original_materials[(i, j)] = slot.material
 
-            new_mat = slot.material.copy()
-            new_mat.rename(f"___{bsdf_input_name.replace(' ', '')}Export_{i}_{j}")
-            new_mat.use_nodes = True
-            nt = new_mat.node_tree
-
-            # Find Material Output
-            for node in nt.nodes:
-                if node.type == "OUTPUT_MATERIAL":
-                    out_node = node
-                    break
-            else:
-                print(
-                    f"Obj {obj_config.object_name} slot {j}: Could not find material output"
-                )
-                continue
-
-            surface_input = out_node.inputs.get("Surface")
-            if not surface_input or not surface_input.is_linked:
-                print(
-                    f"Obj {obj_config.object_name} slot {j}: Material output surface not linked"
-                )
-                continue
-            surface_input_link = surface_input.links[0]
-            surface_source_node = surface_input_link.from_node
-
-            if surface_source_node.type == "BSDF_PRINCIPLED":
-                # Make an Emission node
-                emission = nt.nodes.new("ShaderNodeEmission")
-                emission.location = surface_source_node.location
-
-                # Use the BSDF base color as emission input
-                base_input = surface_source_node.inputs[bsdf_input_name]
-                if base_input.is_linked:
-                    nt.links.new(
-                        base_input.links[0].from_socket, emission.inputs["Color"]
-                    )
-                else:
-                    if isinstance(base_input.default_value, float):
-                        val = base_input.default_value
-                        emission.inputs["Color"].default_value = (val, val, val, 1.0)
-                    else:
-                        emission.inputs["Color"].default_value = (
-                            base_input.default_value
-                        )
-
-                # Reconnect emission -> output
-                nt.links.new(emission.outputs["Emission"], surface_input_link.to_socket)
-
-                # Optionally: mute the original BSDF
-                surface_source_node.mute = True
+            new_mat = reconnect_bsdf_input(
+                slot.material.copy(), bsdf_input_name=bsdf_input_name
+            )
             slot.material = new_mat
 
     scene = bpy.context.scene
@@ -231,87 +183,6 @@ def render_roughness_extract(
     config: AnimSpriteConfig, frame: int, output_dir: Path
 ) -> Path:
     return render_bsdf_input(config, frame, output_dir, "Roughness", "roughness")
-
-
-def render_diffuse_legacy(
-    config: AnimSpriteConfig, frame: int, output_dir: Path
-) -> Path:
-    """Configure Blender to output specific render passes (Diffuse and Normal)."""
-    setup(config, frame)
-
-    scene = bpy.context.scene
-    scene.render.engine = "CYCLES"
-    view_layer = scene.view_layers["ViewLayer"]
-    scene.render.film_transparent = True
-    scene.render.filepath = ""
-    # Set "view transform" to "Raw"
-    scene.view_settings.view_transform = "Raw"
-
-    # Enable Diffuse and Normal passes
-    view_layer.use_pass_diffuse_color = True  # Enable diffuse pass
-    view_layer.use_pass_normal = True  # Enable normal map pass
-    view_layer.use_pass_z = True  # Enable normal map pass
-
-    # Set image output settings
-    scene.render.image_settings.file_format = (
-        "PNG"  # Ensure output as PNG (supports alpha for diffuse)
-    )
-    scene.render.image_settings.color_mode = (
-        "RGBA"  # Enable transparency (for diffuse if needed)
-    )
-    scene.render.filter_size = 0.01
-
-    # Switch on nodes and get reference
-    scene.use_nodes = True
-    cleanup_nodes()
-    tree = scene.node_tree
-    world_tree = scene.world.node_tree
-    links = tree.links
-
-    bg_node = world_tree.nodes["Background"]
-    bg_node.inputs["Strength"].default_value = 0.0
-
-    # Create a node for outputting the rendered image
-    image_output_node = tree.nodes.new(type="CompositorNodeOutputFile")
-    image_output_node.label = "Image_Output"
-    image_output_node.base_path = str(output_dir.joinpath("diffuse"))
-    image_output_node.file_slots[0].path = f"diffuse_####"
-    image_output_node.location = 400, 0
-
-    # Create a node for the output from the renderer
-    render_layers_node = tree.nodes.new(type="CompositorNodeRLayers")
-    render_layers_node.location = 0, 0
-
-    # Create a Separate RGBA node to split the image into RGBA components
-    separate_rgba_node = tree.nodes.new(type="CompositorNodeSepRGBA")
-    separate_rgba_node.location = 200, 100
-
-    # Link the Image output to the Separate RGBA node
-    links.new(
-        render_layers_node.outputs["Image"], separate_rgba_node.inputs[0]
-    )  # Image to Separate RGBA
-
-    alpha_over_node = tree.nodes.new(type="CompositorNodeAlphaOver")
-    alpha_over_node.location = 200, 0
-
-    # Link the diffuse color and image outputs to the Alpha Over node
-    links.new(separate_rgba_node.outputs["A"], alpha_over_node.inputs[0])
-    links.new(
-        render_layers_node.outputs["Image"], alpha_over_node.inputs[1]
-    )  # Image to Alpha Over (Image 2)
-    links.new(
-        render_layers_node.outputs["DiffCol"], alpha_over_node.inputs[2]
-    )  # Diffuse Color to Alpha Over (Image 1)
-
-    # Link all the nodes together
-    links.new(alpha_over_node.outputs["Image"], image_output_node.inputs["Image"])
-
-    scene.frame_set(frame)
-    bpy.ops.render.render(write_still=True)
-
-    pathmaker = lambda t: output_dir.joinpath(f"{t}/{t}_{frame:04d}.png")
-
-    return pathmaker("diffuse")
 
 
 def render_normal(config: AnimSpriteConfig, frame: int, output_dir: Path) -> Path:
