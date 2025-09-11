@@ -83,11 +83,19 @@ def render_texture(config: MaterialConfig, texture_type: str, file_output):
 
     material = bpy.data.materials[config.material_name]
 
-    if texture_type in {"diffuse", "normal"}:
+    if texture_type == "normal":
         bake_texture(
             material=material,
             config=config,
             texture_type=texture_type,
+            file_output=file_output,
+        )
+    elif texture_type == "diffuse":
+        material = reconnect_bsdf_input(material, bsdf_input_name="Base Color")
+        bake_texture(
+            material=material,
+            config=config,
+            texture_type="emissive",
             file_output=file_output,
         )
     elif texture_type == "roughness":

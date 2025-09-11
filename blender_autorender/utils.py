@@ -6,6 +6,7 @@ from uuid import uuid4
 from PIL import Image
 import numpy as np
 
+
 def pack_channels(
     red: Path | None,
     green: Path | None,
