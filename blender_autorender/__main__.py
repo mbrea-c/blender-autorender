@@ -53,6 +53,9 @@ def main():
     output_dir = resolve_path(args.config, config.output_dir)
     log_path = resolve_path(args.config, Path("autorender.log"))
     for collection in config.collections:
+        if args.asset_collection is not None and args.asset_collection != collection.id:
+            continue
+
         collection_output_dir = output_dir.joinpath(collection.id)
 
         print(
