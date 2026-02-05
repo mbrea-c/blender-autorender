@@ -30,15 +30,20 @@ class AnimSceneProcessor:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        self._clear_all_object_animations()
+        # This seems to not be needed (?) and also messes up certain animations
+        # (??)
+        # self._clear_all_object_animations()
+
         self._delete_unwanted_anims()
         self._setup()
 
-        for action_config in self.config.action_configs:
-            self._bake_action(action_config)
+        # Not needed in our workflow, we can just set settings in export
+        # for action_config in self.config.action_configs:
+        #     self._bake_action(action_config)
 
-        for action_config in self.config.action_configs:
-            self._move_action_to_nla(action_config)
+        # This seems to not be needed (?)
+        # for action_config in self.config.action_configs:
+        #     self._move_action_to_nla(action_config)
 
         self._clear_active_animation()
         self._export_gltf()
@@ -69,9 +74,6 @@ class AnimSceneProcessor:
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
 
-        if obj.animation_data.nla_tracks:
-            obj.animation_data.nla_tracks.clear()
-
         if obj.type == "ARMATURE":
             bpy.ops.object.mode_set(mode="POSE")
             bpy.ops.pose.select_all(action="SELECT")
@@ -82,7 +84,7 @@ class AnimSceneProcessor:
             step=config.bake_config.step,
             only_selected=False,
             visual_keying=True,
-            clear_constraints=False,
+            clear_constraints=True,
             clear_parents=False,
             use_current_action=True,
         )
@@ -110,8 +112,10 @@ class AnimSceneProcessor:
             export_format="GLB",
             export_animations=True,
             export_animation_mode="ACTIONS",
-            export_force_sampling=False,
+            export_force_sampling=True,
+            export_bake_animation=True,
             export_apply=True,
+            export_def_bones=True,
         )
 
     def _save_temp_for_debug(self, name: str = "debug_scene"):
