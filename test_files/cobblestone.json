@@ -1,11 +1,7 @@
 {
+  "variant": "material",
   "blend_file_path": "cobblestone.blend",
-  "output_dir": "outputs/cobblestone",
-  "material_configs": [
-    {
-      "id": "cobblestone_floor",
-      "sprite_size": 64,
-      "material_name": "Cobblestone"
-    }
-  ]
+  "id": "cobblestone_floor",
+  "sprite_size": 64,
+  "material_name": "Cobblestone"
 }

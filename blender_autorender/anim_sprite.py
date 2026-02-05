@@ -1,6 +1,10 @@
 from pathlib import Path
 from typing import Any
-from blender_autorender.utils import pack_channels, reconnect_bsdf_input
+from blender_autorender.utils import (
+    pack_channels,
+    reconnect_bsdf_input,
+    run_with_redirected_logs,
+)
 import bpy
 import os
 from PIL import Image
@@ -411,12 +415,10 @@ def build_spritesheet(
     print(f"Spritesheet saved at {spritesheet_output_path}")
 
 
-def render_spritesheet(
-    config: AnimSpriteConfig, blend_file_path: Path, output_dir: Path
-):
+def render_spritesheet(config: AnimSpriteConfig, output_dir: Path):
     """Render an animation as a spritesheet."""
 
-    bpy.ops.wm.open_mainfile(filepath=str(blend_file_path))
+    bpy.ops.wm.open_mainfile(filepath=str(config.blend_file_path))
 
     # Ensure output directory exists
     if not os.path.exists(output_dir):
@@ -470,11 +472,11 @@ def validations(config: AnimSpriteConfig):
         raise ValueError("Frame step does not divide the total number of frames")
 
 
-def entrypoint(
-    config: AnimSpriteConfig, blend_file_path: Path, toplevel_output_dir: Path
-):
+def entrypoint(config: AnimSpriteConfig, toplevel_output_dir: Path, log_path: Path):
     output_dir = toplevel_output_dir.joinpath("spritesheets").joinpath(config.id)
 
     validations(config)
 
-    render_spritesheet(config, blend_file_path=blend_file_path, output_dir=output_dir)
+    run_with_redirected_logs(
+        log_path, lambda: render_spritesheet(config, output_dir=output_dir)
+    )

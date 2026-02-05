@@ -1,31 +1,22 @@
-from dataclasses import dataclass, field
-from typing import List
-from dataclasses_json import dataclass_json
-import dataclasses_json.cfg
+from pydantic import BaseModel, Field, RootModel
+from typing import List, Literal
 from pathlib import Path
 
-dataclasses_json.cfg.global_config.encoders[Path] = str
-dataclasses_json.cfg.global_config.decoders[Path] = Path
 
-
-@dataclass_json
-@dataclass
-class ObjConfig:
+class ObjConfig(BaseModel):
     object_name: str
     action_name: str | None
 
 
-@dataclass_json
-@dataclass
-class CameraConfig:
+class CameraConfig(BaseModel):
     # Options: FRONT, SIDE, TOP
     view: str = "TOP"
     ortho_scale: float = 2
 
 
-@dataclass_json
-@dataclass
-class AnimSpriteConfig:
+class AnimSpriteConfig(BaseModel):
+    variant: Literal["anim_sprite"]
+    blend_file_path: Path
     # Used to create a named directory for the outputs
     id: str
 
@@ -36,13 +27,13 @@ class AnimSpriteConfig:
     end_frame: int = 24
     frame_step: int = 1
     include_last_frame: bool = False
-    camera: CameraConfig = field(default_factory=CameraConfig)
-    object_configs: list[ObjConfig] = field(default_factory=list)
+    camera: CameraConfig = Field(default_factory=CameraConfig)
+    object_configs: list[ObjConfig] = Field(default_factory=list)
 
 
-@dataclass_json
-@dataclass
-class MaterialConfig:
+class MaterialConfig(BaseModel):
+    variant: Literal["material"]
+    blend_file_path: Path
     # Used to create a named directory for the outputs
     id: str
     # Name of material in blend file
@@ -51,38 +42,34 @@ class MaterialConfig:
     sprite_size: int
 
 
-@dataclass_json
-@dataclass
-class BakeConfig:
+class BakeConfig(BaseModel):
     step: int = 1
 
 
-@dataclass_json
-@dataclass
-class ActionConfig:
+class ActionConfig(BaseModel):
     action_name: str
     bake_config: BakeConfig
 
 
-@dataclass_json
-@dataclass
-class AnimSceneConfig:
+class AnimSceneConfig(BaseModel):
+    variant: Literal["anim_scene"]
+    blend_file_path: Path
     # Used to create a named directory for the outputs
     id: str
     object_name: str
-    action_configs: list[ActionConfig] = field(default_factory=list)
+    action_configs: List[ActionConfig] = Field(default_factory=list)
 
 
-@dataclass_json
-@dataclass
-class TopLevelConfig:
-    # Path to the .blend file to load. If relative, is relative to config file
-    blend_file_path: Path
-    # Path to the output directory. If relative, is relative to config file
-    output_dir: Path
-    # If present, a material will be processed from the given blend file
-    material_configs: List[MaterialConfig] = field(default_factory=list)
-    # If present, an animated sprite will be processed from the given blend file
-    anim_sprite_configs: List[AnimSpriteConfig] = field(default_factory=list)
-    # If present, a gltf animated scene will be processed from the given blend file
-    anim_scene_configs: List[AnimSceneConfig] = field(default_factory=list)
+class AssetConfig(RootModel):
+    root: MaterialConfig | AnimSpriteConfig | AnimSceneConfig
+
+
+class AssetCollection(BaseModel):
+    # Used to create a named directory for the outputs
+    id: str
+    asset_configs: List[Path] = Field(default_factory=list)
+
+
+class TopLevelConfig(BaseModel):
+    output_dir: Path = Field(default_factory=lambda: Path("outputs"))
+    collections: List[AssetCollection]

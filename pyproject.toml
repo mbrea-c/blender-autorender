@@ -1,22 +1,29 @@
-[tool.poetry]
+[project]
 name = "blender-autorender"
 version = "0.1.0"
 description = ""
-authors = ["Manuel Brea <m.brea.carreras@gmail.com>"]
-# readme = "README.md"
-# license = "BSD"
-packages = [{ include = "blender_autorender" }]
+authors = [{ name = "Manuel Brea", email = "m.brea.carreras@gmail.com" }]
+requires-python = ">=3.11,<3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "bpy>=4.2.0,<5",
+    "pillow>=11.0.0,<12",
+    "numpy>=1.0,<2",
+    "pydantic>=2.12.5",
+]
 
-[tool.poetry.dependencies]
-python = "~3.11"
-bpy = "^4.2.0"
-pillow = "^11.0.0"
-dataclasses-json = "^0.6.7"
-numpy = "^2.3.2"
-
-[tool.poetry.scripts]
+[project.scripts]
 blender-autorender = "blender_autorender.__main__:main"
 
+[tool.uv]
+
+[tool.uv.build-backend]
+module-name = ["blender_autorender"]
+module-root = ""
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"

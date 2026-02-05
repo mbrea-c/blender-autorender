@@ -1,0 +1,17 @@
+{
+  "collections": [
+    {
+      "id": "test-collection-1",
+      "asset_configs": [
+        "animated_human.json"
+      ]
+    },
+    {
+      "id": "test-collection-2",
+      "asset_configs": [
+        "cobblestone.json",
+        "monkey.json"
+      ]
+    }
+  ]
+}

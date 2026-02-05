@@ -1,7 +1,9 @@
 # pyright: basic
+import sys
+import os
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 from PIL import Image
 import numpy as np
@@ -129,3 +131,17 @@ def reconnect_bsdf_input(
         # Optionally: mute the original BSDF
         surface_source_node.mute = True
     return new_mat
+
+
+def run_with_redirected_logs(log_file: Path, callable: Callable[[], Any]) -> Any:
+    open(log_file, "a").close()
+    old = os.dup(sys.stdout.fileno())
+    sys.stdout.flush()
+    os.close(sys.stdout.fileno())
+    fd = os.open(log_file, os.O_WRONLY)
+
+    out = callable()
+
+    os.close(fd)
+    os.dup(old)
+    os.close(old)

@@ -1,4 +1,5 @@
 # pyright: strict
+from blender_autorender.utils import run_with_redirected_logs
 
 import os
 from pathlib import Path
@@ -12,19 +13,19 @@ bpy: Any
 
 class AnimSceneProcessor:
     def __init__(
-        self,
-        config: AnimSceneConfig,
-        blend_file_path: Path,
-        toplevel_output_dir: Path,
+        self, config: AnimSceneConfig, toplevel_output_dir: Path, log_path: Path
     ):
         self.config = config
-        self.blend_file_path = blend_file_path
         self.output_dir = toplevel_output_dir.joinpath("anim_scenes").joinpath(
             config.id
         )
+        self.log_path = log_path
 
     def process(self):
-        bpy.ops.wm.open_mainfile(filepath=str(self.blend_file_path))
+        run_with_redirected_logs(self.log_path, lambda: self._process())
+
+    def _process(self):
+        bpy.ops.wm.open_mainfile(filepath=str(self.config.blend_file_path))
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)

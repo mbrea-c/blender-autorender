@@ -1,7 +1,11 @@
 from pathlib import Path
 from typing import Any
 from blender_autorender.config import MaterialConfig
-from blender_autorender.utils import pack_channels, reconnect_bsdf_input
+from blender_autorender.utils import (
+    pack_channels,
+    reconnect_bsdf_input,
+    run_with_redirected_logs,
+)
 import bpy
 import os
 
@@ -75,8 +79,6 @@ def bake_texture(
     image.file_format = "PNG"
     image.save()
 
-    print(f"{texture_type.capitalize()} map saved to: {file_output}")
-
 
 def render_texture(config: MaterialConfig, texture_type: str, file_output):
     setup()
@@ -117,8 +119,8 @@ def render_texture(config: MaterialConfig, texture_type: str, file_output):
 
 
 # Main function to bake and save all maps
-def bake_material_maps(config: MaterialConfig, blend_file_path: Path, output_dir: Path):
-    bpy.ops.wm.open_mainfile(filepath=str(blend_file_path))
+def bake_material_maps(config: MaterialConfig, output_dir: Path):
+    bpy.ops.wm.open_mainfile(filepath=str(config.blend_file_path))
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -142,13 +144,13 @@ def bake_material_maps(config: MaterialConfig, blend_file_path: Path, output_dir
         output_dir=output_dir,
     )
 
-    print("🥧 Baking completed!🥧")
-
     return
 
 
 def entrypoint_material(
-    config: MaterialConfig, blend_file_path: Path, toplevel_output_dir: Path
+    config: MaterialConfig, toplevel_output_dir: Path, log_path: Path
 ):
     output_dir = toplevel_output_dir.joinpath("materials").joinpath(config.id)
-    bake_material_maps(config, blend_file_path=blend_file_path, output_dir=output_dir)
+    run_with_redirected_logs(
+        log_path, lambda: bake_material_maps(config, output_dir=output_dir)
+    )

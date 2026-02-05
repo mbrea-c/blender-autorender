@@ -1,6 +1,0 @@
-{
-  "typeCheckingMode": "basic",
-  "extraPaths": [
-    "stubs"
-  ]
-}
